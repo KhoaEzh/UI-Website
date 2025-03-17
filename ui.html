@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Side-by-Side Videos</title>
+  <style>
+    .container {
+      display: flex;
+      justify-content: space-between;
+    }
+    video, canvas {
+      width: 48%;
+      border: 1px solid #ccc;
+    }
+    .footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      background-color: #f0f0f0;
+      padding: 10px 0;
+      font-size: 16px;
+      border-top: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>Side-by-Side Videos: Default and Edge Detection</h1>
+  <input type="file" id="videoInput" accept="video/*">
+  <div class="container">
+    <video id="video" controls></video>
+    <canvas id="edgeCanvas"></canvas>
+  </div>
+  <div class="footer">
+    <p>22127024 - Đặng Trần Anh Khoa</p> <!-- Placed at the bottom center -->
+  </div>
+
+  <script>
+    const videoInput = document.getElementById("videoInput");
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("edgeCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Handle video file input
+    videoInput.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const url = URL.createObjectURL(file);
+        video.src = url;
+        video.onloadedmetadata = () => {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          processVideo();
+        };
+      }
+    });
+
+    // Process video frames
+    function processVideo() {
+      if (video.paused || video.ended) {
+        return; // Stop processing if the video is paused or ended
+      }
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const edgeFrame = applyEdgeDetection(frame);
+      ctx.putImageData(edgeFrame, 0, 0);
+      requestAnimationFrame(processVideo);
+    }
+
+    // Apply edge detection using a Sobel filter
+    function applyEdgeDetection(imageData) {
+      const { width, height, data } = imageData;
+      const output = new ImageData(width, height);
+      const grayScale = [];
+
+      // Convert to grayscale
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
+        grayScale.push(gray);
+      }
+
+      // Sobel kernel for edge detection
+      const kernelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+      const kernelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          let gx = 0, gy = 0;
+
+          for (let ky = -1; ky <= 1; ky++) {
+            for (let kx = -1; kx <= 1; kx++) {
+              const pixel =
+                grayScale[(y + ky) * width + (x + kx)] || 0;
+              const kernelIndex = (ky + 1) * 3 + (kx + 1);
+              gx += kernelX[kernelIndex] * pixel;
+              gy += kernelY[kernelIndex] * pixel;
+            }
+          }
+
+          const magnitude = Math.sqrt(gx ** 2 + gy ** 2) | 0;
+          const index = (y * width + x) * 4;
+          output.data[index] = magnitude;
+          output.data[index + 1] = magnitude;
+          output.data[index + 2] = magnitude;
+          output.data[index + 3] = 255; // Alpha channel
+        }
+      }
+
+      return output;
+    }
+
+    // Start processing the video when it plays
+    video.addEventListener("play", processVideo);
+  </script>
+</body>
+</html>
